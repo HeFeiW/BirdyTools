@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>高级任务矩阵</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧任务矩阵 -->
+        <div class="matrix-container">
+            <h2>任务矩阵 (未完成: {{ tasks|length }}, 已完成: {{ finished_count }})</h2>
+            <div class="matrix-legend">
+                <div v-for="(color, type) in colors" :style="{color: color}">■ {{ type }}</div>
+            </div>
+            <canvas id="taskMatrix"></canvas>
+        </div>
+
+        <!-- 右侧任务表单 -->
+        <div class="task-form-container">
+            <form id="task-form">
+                <!-- 基础字段 -->
+                <input type="text" id="task-input" placeholder="任务内容*" required>
+                <select id="task-type">
+                    {% for type in task_types %}
+                    <option value="{{ type }}">{{ type }}</option>
+                    {% endfor %}
+                </select>
+                <textarea id="task-note" placeholder="备注 (最多200字)" maxlength="200"></textarea>
+
+                <!-- 滑块组 -->
+                <div class="slider-group">
+                    <div>
+                        <label>重要性: <span id="priority-value">5</span>/10</label>
+                        <input type="range" id="priority" min="0" max="10" value="5">
+                    </div>
+                    <div>
+                        <label>紧急性: <span id="urgency-value">5</span>/10</label>
+                        <input type="range" id="urgency" min="0" max="10" value="5">
+                    </div>
+                    <div>
+                        <label>任务量: <span id="workload-value">5</span>/10</label>
+                        <input type="range" id="workload" min="0" max="10" value="5">
+                    </div>
+                </div>
+
+                <!-- 时间字段 -->
+                <div class="time-fields">
+                    <input type="date" id="due-date">
+                    <input type="time" id="due-time" value="23:59">
+                </div>
+
+                <button type="submit">添加任务</button>
+            </form>
+
+            <!-- 任务列表 -->
+            <div class="task-list">
+                <div class="task-sort">
+                    <label for="sort-tasks">排序方式:</label>
+                    <select id="sort-tasks">
+                        <option value="workload-asc">任务量（从小到大）</option>
+                        <option value="workload-desc">任务量（从大到小）</option>
+                        <option value="priority">重要性</option>
+                        <option value="urgency">紧急性</option>
+                        <option value="due-date">截止日期</option>
+                    </select>
+                </div>
+                <div id="task-cards">
+                    {% for task in tasks %}
+                    <div class="task-card" data-type="{{ task.type }}" 
+                         data-priority="{{ task.priority }}" data-urgency="{{ task.urgency }}"
+                         data-workload="{{ task.workload }}" data-due-date="{{ task.due_date }}">
+                        <span class="task-text" style="color: {{ colors[task.type] }}">{{ task.text }}</span>
+                        <div class="task-actions">
+                            <button class="edit-task">修改</button>
+                            <button class="complete-task">完成</button>
+                            <button class="delete-task">删除</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化矩阵图表
+        // 自定义插件：绘制四个象限背景色
+        const quadrantBackgroundPlugin = {
+            id: 'quadrantBackground',
+            beforeDraw: (chart) => {
+                const { ctx, chartArea, scales } = chart;
+                const { left, right, top, bottom } = chartArea;
+                const xCenter = scales.x.getPixelForValue(5); // 中心点 x 坐标
+                const yCenter = scales.y.getPixelForValue(5); // 中心点 y 坐标
+
+                // 绘制四个象限的背景色
+                ctx.save();
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.1)'; // 第一象限背景色
+                ctx.fillRect(xCenter, top, right - xCenter, yCenter - top);
+
+                ctx.fillStyle = 'rgba(0, 255, 0, 0.1)'; // 第二象限背景色
+                ctx.fillRect(left, top, xCenter - left, yCenter - top);
+
+                ctx.fillStyle = 'rgba(0, 0, 255, 0.1)'; // 第三象限背景色
+                ctx.fillRect(left, yCenter, xCenter - left, bottom - yCenter);
+
+                ctx.fillStyle = 'rgba(255, 255, 0, 0.1)'; // 第四象限背景色
+                ctx.fillRect(xCenter, yCenter, right - xCenter, bottom - yCenter);
+
+                ctx.restore();
+            }
+        };
+
+        // 注册插件
+        Chart.register(quadrantBackgroundPlugin);
+
+        const ctx = document.getElementById('taskMatrix').getContext('2d');
+        const matrixChart = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    {% for type, color in colors.items() %}
+                    {
+                        label: '{{ type }}',
+                        data: [
+                            {% for task in tasks %}
+                            {% if task.type == type %}
+                            {
+                                x: {{ task.x }},
+                                y: {{ task.y }},
+                                text: `{{ task.text }}`,
+                                radius: {{  task.radius }},
+                                index: {{ loop.index0 }}
+                            },
+                            {% endif %}
+                            {% endfor %}
+                        ],
+                        backgroundColor: '{{ color }}',
+                        borderColor: 'rgba(0,0,0,0.3)',
+                        borderWidth: 3,
+                        // 添加点样式配置
+                        pointStyle: 'circle',
+                    },
+                    {% endfor %}
+                ]
+            },
+            options: {
+                scales: {
+                    x: {
+                        min: 0, max: 11,
+                        ticks: {
+                            stepSize: 1 // 确保 x 轴单位长度一致
+                        },
+                        title: { display: true, text: '紧急性' }
+                    },
+                    y: {
+                        min: 0, max: 11,
+                        ticks: {
+                            stepSize: 1 // 确保 x 轴单位长度一致
+                        },
+                        title: { display: true, text: '重要性' }
+                    }
+                },
+                onClick: (e, elements) => {
+                    if (elements[0]) {
+                        const index = elements[0].element.$context.raw.index;
+                        document.querySelector(`.task-card:nth-child(${index+1})`).scrollIntoView();
+                    }
+                },
+                elements: {
+                    point: {
+                        radius: function(context) {
+                            const dataPoint = context.dataset.data[context.dataIndex];
+                            if (!dataPoint) {
+                                
+                                return 0; // 返回默认半径
+                            }
+                            console.log(dataPoint);
+                            return dataPoint.radius;
+                        },
+                        hoverRadius: function(context) {
+                            const dataPoint = context.dataset.data[context.dataIndex];
+                            if (!dataPoint) {
+                                
+                                return 0; // 返回默认半径
+                            }
+                            return dataPoint.radius + 2; // 鼠标悬停时放大 2 像素
+                        },
+                        pointHitRadius: function(context) {
+                            const dataPoint = context.dataset.data[context.dataIndex];
+                            if (!dataPoint) {
+                                
+                                return 0; // 返回默认半径
+                            }
+                            return 0;
+                            // return dataPoint.radius ;
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => ctx.raw.text
+                        }
+                    }
+                }
+            }
+        });
+        const canvas = document.getElementById('taskMatrix');
+        const container = document.querySelector('.matrix-container');
+
+        // 确保 canvas 宽高一致
+        function adjustCanvasSize() {
+            const size = Math.min(container.offsetWidth, container.offsetHeight);
+            canvas.width = size*0.5;
+            canvas.height = size;
+            matrixChart.resize(); // 调整图表大小
+        }
+
+        // 调整大小时触发
+        window.addEventListener('resize', adjustCanvasSize);
+        adjustCanvasSize(); // 初始化时调用
+        // 滑块实时显示
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            slider.addEventListener('input', e => {
+                document.getElementById(`${e.target.id}-value`).textContent = e.target.value;
+            });
+        });
+
+        // 表单提交
+        document.getElementById('task-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('task', document.getElementById('task-input').value);
+            formData.append('note', document.getElementById('task-note').value);
+            formData.append('type', document.getElementById('task-type').value);
+            formData.append('priority', document.getElementById('priority').value);
+            formData.append('urgency', document.getElementById('urgency').value);
+            formData.append('workload', document.getElementById('workload').value);
+            formData.append('due_date', document.getElementById('due-date').value);
+            formData.append('due_time', document.getElementById('due-time').value);
+
+            await fetch('/add', { method: 'POST', body: new URLSearchParams(formData) });
+            location.reload();
+        });
+
+        async function completeTask(index) {
+            await fetch(`/complete/${index}`, { method: 'POST' });
+            location.reload();
+        }
+
+        async function deleteTask(index) {
+            await fetch(`/delete/${index}`, { method: 'POST' });
+            location.reload();
+        }
+        document.getElementById('sort-tasks').addEventListener('change', (e) => {
+        const sortType = e.target.value;
+        const taskCards = Array.from(document.querySelectorAll('.task-card'));
+        const taskList = document.getElementById('task-cards');
+
+            // 排序逻辑
+        const sortedCards = taskCards.sort((a, b) => {
+            switch (sortType) {
+                case 'workload-asc': // 按任务量从小到大
+                    return a.dataset.workload - b.dataset.workload;
+                case 'workload-desc': // 按任务量从大到小
+                    return b.dataset.workload - a.dataset.workload;
+                case 'priority': // 按重要性
+                    return b.dataset.priority - a.dataset.priority;
+                case 'urgency': // 按紧急性
+                    return b.dataset.urgency - a.dataset.urgency;
+                case 'due-date': // 按截止日期
+                    return new Date(a.dataset.dueDate) - new Date(b.dataset.dueDate);
+                default:
+                    return 0;
+            }
+        });
+
+        // 重新排列任务卡片
+        taskList.innerHTML = '';
+        sortedCards.forEach(card => taskList.appendChild(card));
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+    // 修改任务
+    document.querySelectorAll('.edit-task').forEach((button, index) => {
+    button.addEventListener('click', () => {
+        // 跳转到编辑页面
+        window.location.href = `/edit/${index}`;
+    });
+});
+
+    // 完成任务
+    document.querySelectorAll('.complete-task').forEach((button, index) => {
+        button.addEventListener('click', () => {
+            fetch(`/complete/${index}`, { method: 'POST' })
+                .then(() => location.reload());
+        });
+    });
+
+    // 删除任务
+    document.querySelectorAll('.delete-task').forEach((button, index) => {
+        button.addEventListener('click', () => {
+            if (confirm('确定要删除这个任务吗？')) {
+                fetch(`/delete/${index}`, { method: 'POST' })
+                    .then(() => location.reload());
+            }
+        });
+    });
+    });
+    </script>
+</body>
+</html>

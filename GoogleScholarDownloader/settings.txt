@@ -1,0 +1,4 @@
+SLEEP_TIME = 1
+OUTPUT_FOLDER = arxiv_pdfs
+CSV_FILE = citations.csv
+REPLACE_SPACE = False

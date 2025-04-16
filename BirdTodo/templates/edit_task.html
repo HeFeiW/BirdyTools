@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>编辑任务</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>编辑任务</h1>
+    <form method="POST">
+        <label for="task">任务内容:</label>
+        <input type="text" id="task" name="task" value="{{ task.text }}" required>
+
+        <label for="type">任务类型:</label>
+        <select id="type" name="type">
+            <option value="工作" {% if task.type == "工作" %}selected{% endif %}>工作</option>
+            <option value="学习" {% if task.type == "学习" %}selected{% endif %}>学习</option>
+            <option value="生活" {% if task.type == "生活" %}selected{% endif %}>生活</option>
+        </select>
+
+        <label for="priority">重要性:</label>
+        <input type="range" id="priority" name="priority" min="0" max="10" value="{{ task.priority }}">
+
+        <label for="urgency">紧急性:</label>
+        <input type="range" id="urgency" name="urgency" min="0" max="10" value="{{ task.urgency }}">
+
+        <label for="workload">任务量:</label>
+        <input type="range" id="workload" name="workload" min="0" max="10" value="{{ task.workload }}">
+
+        <label for="due_date">截止日期:</label>
+        <input type="date" id="due_date" name="due_date" value="{{ task.due_date }}">
+
+        <label for="due_time">截止时间:</label>
+        <input type="time" id="due_time" name="due_time" value="{{ task.due_time }}">
+
+        <button type="submit">保存修改</button>
+        <a href="/">取消</a>
+    </form>
+</body>
+</html>
